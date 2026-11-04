@@ -4,22 +4,22 @@ The Agentrail command line. Sign in once, then use every Agentrail tool —
 competitors, prompts, evaluations, simulation runs, the Brand Vault — from a
 terminal or from an AI coding agent.
 
-> Agentrail's production environment is not open yet. Until it is, use the
-> dev environment: pass `--env dev` or set `AGENTRAIL_ENV=dev`.
+Production is the default. To use the separate dev environment, pass
+`--env dev` or set `AGENTRAIL_ENV=dev`.
 
 ## Use
 
 ```sh
-npm install -g agentrail-cli@next      # pre-releases, while production is not open
-agentrail --env dev login              # sign in in your browser
-agentrail --env dev tools              # every command your role can use
-agentrail --env dev competitors list
-agentrail --env dev agent setup        # Claude Code, Codex and Cursor
-agentrail --env dev doctor             # what is missing, and how to fix it
+npm install -g agentrail-cli@latest
+agentrail login              # sign in in your browser
+agentrail tools              # every command your role can use
+agentrail competitors list
+agentrail agent setup        # Claude Code, Codex and Cursor
+agentrail doctor             # what is missing, and how to fix it
 ```
 
 From a clone of this repository: `pnpm install && pnpm build`, then
-`node dist/cli.js --env dev login`.
+`node dist/cli.js login`.
 
 The package installs one command, `agentrail`. Never install a package named
 just `agentrail`: it belongs to someone else.
@@ -41,8 +41,8 @@ just `agentrail`: it belongs to someone else.
   project of yours (`--project` for this repository only, `--only` to pick
   agents, `--read-only` for the server that only reads). Each agent signs in
   to the server itself. In Claude Code you can also run
-  `/plugin marketplace add GrowthOS-co/agentrail-cli`, and any agent that
-  reads Agent Skills can use `npx skills add GrowthOS-co/agentrail-cli`.
+  `/plugin marketplace add agentrail-co/agentrail-cli`, and any agent that
+  reads Agent Skills can use `npx skills add agentrail-co/agentrail-cli`.
 - **Updates.** `agentrail update` shows the newest version and how to install
   it. Commands check npm at most once a day and say so on stderr;
   `--no-update-check` or `AGENTRAIL_NO_UPDATE_CHECK=1` turns that off.
@@ -70,6 +70,10 @@ Bump `version` in `package.json` and `.claude-plugin/plugin.json` together,
 merge, then push the tag `v<version>`. The Release workflow publishes it to
 npm with provenance once the `npm` environment's reviewer approves: a
 pre-release such as `0.1.0-dev.2` under `next`, a release under `latest`.
+
+The npm trusted publisher must name GitHub owner `agentrail-co`, repository
+`agentrail-cli`, workflow `release.yml`, and environment `npm`. The package's
+repository URL must match that repository for provenance.
 
 ## License
 

@@ -16,8 +16,8 @@ an agent reaches for, recommends, or succeeds with. You reach it through the
   `agentrail login`: without a terminal it prints a URL and a code as JSON.
   Give both to the user, wait until they confirm the code in their browser,
   then run `agentrail login` again to finish.
-- If a command says Agentrail production is not available yet, add
-  `--env dev` to every command (or set `AGENTRAIL_ENV=dev`).
+- Commands use production by default. Use `--env dev` (or set
+  `AGENTRAIL_ENV=dev`) only when the user wants the separate dev environment.
 - Commands come from Agentrail itself. Run `agentrail tools` to see every
   command your role can use, and `agentrail <area> <action> --help` for one
   command's inputs. Do not guess a command or a flag.

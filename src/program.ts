@@ -34,7 +34,7 @@ import {
   writeLink,
 } from './workspace.js';
 
-const ISSUES_URL = 'https://github.com/GrowthOS-co/agentrail-cli/issues';
+const ISSUES_URL = 'https://github.com/agentrail-co/agentrail-cli/issues';
 
 const BUILT_INS = [
   'login',
