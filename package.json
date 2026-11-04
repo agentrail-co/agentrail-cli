@@ -1,13 +1,13 @@
 {
   "name": "agentrail-cli",
-  "version": "0.1.0-dev.3",
+  "version": "0.1.0",
   "description": "The Agentrail command line: sign in, then use every Agentrail tool from a terminal or an AI coding agent.",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/GrowthOS-co/agentrail-cli.git"
+    "url": "git+https://github.com/agentrail-co/agentrail-cli.git"
   },
-  "homepage": "https://github.com/GrowthOS-co/agentrail-cli#readme",
+  "homepage": "https://github.com/agentrail-co/agentrail-cli#readme",
   "type": "module",
   "bin": {
     "agentrail": "dist/cli.js"
