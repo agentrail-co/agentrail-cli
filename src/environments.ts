@@ -22,7 +22,7 @@ export const ENVIRONMENTS: Environments = {
   prod: {
     name: 'prod',
     mcpUrl: 'https://mcp.agentrail.co/mcp',
-    clientId: undefined,
+    clientId: 'client_01M6J00BXFA5AGF4JT8703WJV1',
   },
   dev: {
     name: 'dev',
