@@ -98,6 +98,16 @@ credentials or private conversations.
 3. Nothing in Agentrail can be deleted from here; send the user to the
    Agentrail web app for that.
 
+### See how agents use the product's MCP server, WebMCP tools or API
+
+1. `agentrail analytics get-agent-tools --view summary --surface mcp` gives a
+   period's calls, error rate, tool error rate, latency and clients against
+   the period before; `--view tools`, `clients` or `calls` break it down.
+   Use `--surface webmcp` or `cli` for the pages' tools or command-line use.
+2. A call with `hasPayload` true has captured content: read it with
+   `agentrail analytics get-agent-tool-payload --event-id <eventId>`. It is
+   the product's customers' data; quote only what the user needs.
+
 ## Reading results
 
 - Output is JSON when you run commands; the first line on stderr is a short
