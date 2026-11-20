@@ -47,11 +47,23 @@ describe('agentrail login', () => {
     expect(cli.sleeps).toEqual([5_000, 5_000, 10_000]);
     expect(cli.opened).toEqual([expect.stringContaining('ABCD-EFGH')]);
     expect(cli.stderr()).toContain('ABCD-EFGH');
-    expect(JSON.parse(keychain.entries.get('dev') ?? '{}')).toMatchObject({
-      accessToken: 'access-1',
-      refreshToken: 'refresh-1',
+    // The device grant's own token is for the client, not the MCP server
+    // (AuthKit ignores `resource` there), so the sign-in refreshes once for
+    // the resource and keeps that token: the spent first pair is never stored.
+    expect(Object.fromEntries(agentrail.tokenRequests.at(-1) ?? [])).toEqual({
+      grant_type: 'refresh_token',
+      refresh_token: 'refresh-1',
+      client_id: 'client_test',
       resource: agentrail.mcpUrl,
     });
+    expect(JSON.parse(keychain.entries.get('dev') ?? '{}')).toMatchObject({
+      accessToken: 'access-2',
+      refreshToken: 'refresh-2',
+      resource: agentrail.mcpUrl,
+    });
+    // What it is for: the first command after signing in is accepted, where
+    // it used to be refused until the token's first refresh.
+    expect(await run(cli.runtime, ['--env', 'dev', 'whoami'])).toBe(0);
   });
 
   // CLI-005: an agent has no terminal to wait in. Its first run hands back

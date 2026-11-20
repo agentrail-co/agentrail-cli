@@ -130,11 +130,14 @@ export async function startFakeAgentrail(): Promise<FakeAgentrail> {
     accessTokens: new Set<string>(),
     refreshTokens: new Set<string>(),
   };
-  const issue = () => {
+  // As AuthKit does: only a token issued for the MCP resource is one the
+  // server takes, and the device grant issues one for the client instead,
+  // whatever `resource` it was sent.
+  const issue = (forResource: boolean) => {
     issued += 1;
     const accessToken = `access-${String(issued)}`;
     const refreshToken = `refresh-${String(issued)}`;
-    fake.accessTokens.add(accessToken);
+    if (forResource) fake.accessTokens.add(accessToken);
     fake.refreshTokens.add(refreshToken);
     return {
       access_token: accessToken,
@@ -186,11 +189,11 @@ export async function startFakeAgentrail(): Promise<FakeAgentrail> {
             json(400, { error: 'invalid_grant' });
             return;
           }
-          json(200, issue());
+          json(200, issue(form.get('resource') === `${origin}/mcp`));
           return;
         }
         const answer = fake.deviceAnswers.shift() ?? { error: 'expired_token' };
-        if (answer === 'tokens') json(200, issue());
+        if (answer === 'tokens') json(200, issue(false));
         else json(400, answer);
       } else if (path === '/mcp') {
         const token = /^Bearer (.+)$/u.exec(
