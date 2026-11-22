@@ -218,6 +218,8 @@ export async function startFakeAgentrail(
         };
   // AuthKit is not on the MCP host; Agentrail's own sign-in server is.
   let authorizationOrigin = '';
+  // The MCP server's URL, the one resource its tokens are for.
+  let resource = '';
   let issued = 0;
   const fake = {
     deviceRequests: [] as URLSearchParams[],
@@ -243,11 +245,16 @@ export async function startFakeAgentrail(
   };
   const organizationOf = (token: string) =>
     fake.organizationOf.get(token) ?? ACME;
-  const issue = (organizationId: string, switched: boolean) => {
+  // Only a token issued for the MCP resource is one the server takes.
+  const issue = (
+    organizationId: string,
+    switched: boolean,
+    forResource: boolean,
+  ) => {
     issued += 1;
     const accessToken = `access-${String(issued)}`;
     const refreshToken = `refresh-${String(issued)}`;
-    fake.accessTokens.add(accessToken);
+    if (forResource) fake.accessTokens.add(accessToken);
     fake.refreshTokens.add(refreshToken);
     fake.organizationOf.set(accessToken, organizationId);
     fake.organizationOf.set(refreshToken, organizationId);
@@ -321,7 +328,7 @@ export async function startFakeAgentrail(
     return [
       200,
       {
-        ...issue(target.id, true),
+        ...issue(target.id, true, form.get('resource') === resource),
         issued_token_type: 'urn:ietf:params:oauth:token-type:access_token',
       },
     ];
@@ -380,6 +387,7 @@ export async function startFakeAgentrail(
             issue(
               organizationOf(presented),
               fake.switchedRefreshTokens.has(presented),
+              form.get('resource') === resource,
             ),
           );
           return;
@@ -390,8 +398,19 @@ export async function startFakeAgentrail(
           return;
         }
         const answer = fake.deviceAnswers.shift() ?? { error: 'expired_token' };
-        if (answer === 'tokens') json(200, issue(fake.approveIn, false));
-        else json(400, answer);
+        // AuthKit ignores `resource` on the device grant: its token names the
+        // client, whatever it was sent (agentrail-cli#14). Agentrail's own
+        // server issues it for the resource.
+        if (answer === 'tokens') {
+          json(
+            200,
+            issue(
+              fake.approveIn,
+              false,
+              signIn === 'agentrail' && form.get('resource') === resource,
+            ),
+          );
+        } else json(400, answer);
       } else if (path === paths.revoke) {
         const form = new URLSearchParams(await bodyOf(request));
         fake.revocations.push(form);
@@ -467,6 +486,7 @@ export async function startFakeAgentrail(
     return `http://127.0.0.1:${String(port)}`;
   };
   const origin = await listen(http);
+  resource = `${origin}/mcp`;
   // AuthKit's own origin answers the same paths, but only its own are asked.
   const authKit = signIn === 'workos' ? createServer(handle) : undefined;
   if (authKit !== undefined) authorizationOrigin = await listen(authKit);
@@ -479,7 +499,7 @@ export async function startFakeAgentrail(
     });
   // The same object the server reads, so a test's later settings take effect.
   return Object.assign(fake, {
-    mcpUrl: `${origin}/mcp`,
+    mcpUrl: resource,
     tokenEndpoint: `${authorizationOrigin || origin}${paths.token}`,
     close: async () => {
       await stop(http);

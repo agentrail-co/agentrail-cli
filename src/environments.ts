@@ -66,3 +66,15 @@ export function clientIdOf(environment: Environment): string {
   }
   return environment.clientId;
 }
+
+/**
+ * Whether a sign-in's server is Agentrail's own, which is on the MCP host:
+ * its issuer is the MCP server's origin (argus apps/api/src/adapters/
+ * oauth-server/provider.ts). WorkOS's AuthKit is on an origin of its own.
+ */
+export function signsInOnMcpHost(
+  environment: Environment,
+  tokenEndpoint: string,
+): boolean {
+  return new URL(tokenEndpoint).origin === new URL(environment.mcpUrl).origin;
+}

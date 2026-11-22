@@ -25,7 +25,8 @@ describe('agentrail login', () => {
   // one it refuses. Agentrail's own sign-in names its scope, and grants
   // nothing without it; WorkOS's takes OpenID's, so an environment switched
   // back to WorkOS still signs in. A slowed-down poll must wait longer, as
-  // RFC 8628 requires, or the authorization server stops answering.
+  // RFC 8628 requires, or the authorization server stops answering. The
+  // first command after signing in must be accepted.
   it.each([
     ['agentrail', 'mcp offline_access'],
     ['workos', 'openid profile email offline_access'],
@@ -37,14 +38,18 @@ describe('agentrail login', () => {
           ? agentrail
           : await startFakeAgentrail({ signIn });
       try {
-        await signsIn(server, scope);
+        await signsIn(server, signIn, scope);
       } finally {
         if (server !== agentrail) await server.close();
       }
     },
   );
 
-  async function signsIn(agentrail: FakeAgentrail, scope: string) {
+  async function signsIn(
+    agentrail: FakeAgentrail,
+    signIn: 'agentrail' | 'workos',
+    scope: string,
+  ) {
     const keychain = memoryKeychain();
     const cli = await testRuntime({
       mcpUrl: agentrail.mcpUrl,
@@ -66,7 +71,9 @@ describe('agentrail login', () => {
       resource: agentrail.mcpUrl,
     });
     expect(
-      agentrail.tokenRequests.map((form) => Object.fromEntries(form)),
+      agentrail.tokenRequests
+        .slice(0, 3)
+        .map((form) => Object.fromEntries(form)),
     ).toEqual(
       Array(3).fill({
         grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
@@ -78,12 +85,34 @@ describe('agentrail login', () => {
     expect(cli.sleeps).toEqual([5_000, 5_000, 10_000]);
     expect(cli.opened).toEqual([expect.stringContaining('ABCD-EFGH')]);
     expect(cli.stderr()).toContain('ABCD-EFGH');
+    // WorkOS's AuthKit issues the device grant's own token for the client,
+    // not the MCP server (it ignores `resource` there), so a sign-in there
+    // refreshes once for the resource and keeps that token: the spent first
+    // pair is never stored. Agentrail's own server needs no refresh.
+    const refreshes =
+      signIn === 'workos'
+        ? [
+            {
+              grant_type: 'refresh_token',
+              refresh_token: 'refresh-1',
+              client_id: 'client_test',
+              resource: agentrail.mcpUrl,
+            },
+          ]
+        : [];
+    expect(
+      agentrail.tokenRequests.slice(3).map((form) => Object.fromEntries(form)),
+    ).toEqual(refreshes);
+    const kept = signIn === 'workos' ? '2' : '1';
     expect(JSON.parse(keychain.entries.get('dev') ?? '{}')).toMatchObject({
-      accessToken: 'access-1',
-      refreshToken: 'refresh-1',
+      accessToken: `access-${kept}`,
+      refreshToken: `refresh-${kept}`,
       tokenEndpoint: agentrail.tokenEndpoint,
       resource: agentrail.mcpUrl,
     });
+    // What it is for: the first command after signing in is accepted, where
+    // at AuthKit it was refused until the token's first refresh.
+    expect(await run(cli.runtime, ['--env', 'dev', 'whoami'])).toBe(0);
   }
 
   // CLI-005: an agent has no terminal to wait in. Its first run hands back

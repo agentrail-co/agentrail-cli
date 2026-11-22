@@ -1,5 +1,5 @@
 import { commandFor, loadCredential, saveCredential } from './credentials.js';
-import type { Environment } from './environments.js';
+import { signsInOnMcpHost, type Environment } from './environments.js';
 import { CliError, EXIT } from './errors.js';
 import { withLock } from './lock.js';
 import { withServer, type Connection } from './mcp.js';
@@ -165,15 +165,10 @@ async function exchangeInto(
       );
     }
     const { credential, storage } = stored;
-    // Agentrail's own sign-in server is on the MCP host: its issuer is the
-    // MCP server's origin (argus apps/api/src/adapters/oauth-server/
-    // provider.ts). A sign-in from any other server, WorkOS's AuthKit
-    // among them, is not one Agentrail exchanges for another
-    // organization's, so nothing is sent to it.
-    if (
-      new URL(credential.tokenEndpoint).origin !==
-      new URL(environment.mcpUrl).origin
-    ) {
+    // A sign-in from any server but Agentrail's own, WorkOS's AuthKit among
+    // them, is not one Agentrail exchanges for another organization's, so
+    // nothing is sent to it.
+    if (!signsInOnMcpHost(environment, credential.tokenEndpoint)) {
       throw cannotSwitchYet(environment, target);
     }
     if (credential.refreshToken === undefined) {

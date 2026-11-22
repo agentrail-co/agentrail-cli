@@ -10,6 +10,7 @@ import { forgetCatalog } from './catalog.js';
 import { discoverSignIn } from './discovery.js';
 import {
   clientIdOf,
+  signsInOnMcpHost,
   type Environment,
   type EnvironmentName,
 } from './environments.js';
@@ -17,7 +18,12 @@ import { CliError, EXIT } from './errors.js';
 import { readJson, removeFile, writePrivateJson } from './files.js';
 import type { Runtime } from './runtime.js';
 import { replaceSignIns, signInsToReplace } from './sign-ins.js';
-import { credentialFrom, postForm, requestTokens } from './tokens.js';
+import {
+  credentialFrom,
+  postForm,
+  requestTokens,
+  type TokenAnswer,
+} from './tokens.js';
 
 const DEVICE_CODE_GRANT = 'urn:ietf:params:oauth:grant-type:device_code';
 /** RFC 8628 §3.2: the polling interval when the server names none. */
@@ -137,6 +143,57 @@ export async function pendingLogin(
   return pending;
 }
 
+type Tokens = Extract<TokenAnswer, { kind: 'tokens' }>;
+
+/**
+ * The tokens a finished device sign-in keeps. WorkOS's AuthKit takes an
+ * access token's audience from `resource` on a refresh, and ignores it on the
+ * device grant: the device grant's own access token names the client, and the
+ * MCP server refuses it. Kept as it came, every command fails until the
+ * token's first refresh, five minutes later. So a sign-in at AuthKit
+ * refreshes once before it is stored, and the first command works.
+ * Agentrail's own sign-in server, on the MCP host, issues the device grant's
+ * token for the resource (RFC 8707), so its tokens are kept as they came.
+ */
+async function tokensForResource(
+  runtime: Runtime,
+  environment: Environment,
+  pending: PendingLogin,
+  issued: Tokens,
+  retry: string,
+): Promise<Tokens> {
+  if (signsInOnMcpHost(environment, pending.tokenEndpoint)) return issued;
+  // Without a refresh token there is nothing to exchange: the token is kept,
+  // and the server says so if it will not take it.
+  if (issued.refreshToken === undefined) return issued;
+  const answer = await requestTokens(runtime, pending.tokenEndpoint, {
+    grant_type: 'refresh_token',
+    refresh_token: issued.refreshToken,
+    client_id: pending.clientId,
+    resource: pending.resource,
+  });
+  if (answer.kind === 'gone') {
+    throw new CliError(
+      EXIT.signIn,
+      `${pending.tokenEndpoint} no longer signs anyone in. Run ${retry} again.`,
+    );
+  }
+  if (answer.kind === 'error') {
+    throw new CliError(
+      EXIT.signIn,
+      `Signing in failed (${answer.error}). Run ${retry} again.`,
+    );
+  }
+  // RFC 6749 §6: a new refresh token replaces the old one; without one, the
+  // old one stays good. The ID token names who signed in: a refresh may not
+  // send another.
+  return {
+    ...answer,
+    refreshToken: answer.refreshToken ?? issued.refreshToken,
+    idToken: answer.idToken ?? issued.idToken,
+  };
+}
+
 /**
  * Polls until the user approves or declines the code in their browser, or it
  * expires, then stores the credential and forgets the pending sign-in.
@@ -168,7 +225,14 @@ export async function completeDeviceLogin(
       // The device code is spent once it has been exchanged: a sign-in that
       // fails to be kept starts again rather than resuming it.
       await removeFile(path);
-      const credential = credentialFrom(runtime, answer, {
+      const tokens = await tokensForResource(
+        runtime,
+        environment,
+        pending,
+        answer,
+        retry,
+      );
+      const credential = credentialFrom(runtime, tokens, {
         environment: environment.name,
         tokenEndpoint: pending.tokenEndpoint,
         clientId: pending.clientId,
